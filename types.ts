@@ -15,11 +15,13 @@ export interface ExtractedCardData {
   cardNumber: string;
 }
 
+// Nordic Dark / Slate Palette
 export const PRESET_COLORS = [
-  { from: '#F48120', to: '#D65A00', name: 'Orange' },
-  { from: '#003399', to: '#001A4D', name: 'Blue' },
-  { from: '#EF4444', to: '#991B1B', name: 'Red' },
-  { from: '#10B981', to: '#047857', name: 'Green' },
-  { from: '#8B5CF6', to: '#5B21B6', name: 'Purple' },
-  { from: '#1F2937', to: '#000000', name: 'Black' },
+  { from: '#475569', to: '#334155', name: 'Slate Blue' }, // 石灰藍 (Main requested color)
+  { from: '#3F3F46', to: '#27272A', name: 'Zinc' },       // Dark Grey
+  { from: '#334155', to: '#1E293B', name: 'Navy Slate' }, // Deep Blue Grey
+  { from: '#115E59', to: '#134E4A', name: 'Deep Teal' },  // Dark Green/Teal
+  { from: '#881337', to: '#4C0519', name: 'Dark Berry' }, // Deep Red
+  { from: '#713F12', to: '#451A03', name: 'Bronze' },     // Dark Brown
+  { from: '#171717', to: '#000000', name: 'Midnight' },   // Black
 ];
