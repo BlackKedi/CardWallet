@@ -179,9 +179,9 @@ export default function App() {
                 {activeCard.type === 'barcode' ? (
                    <Barcode 
                      value={activeCard.cardNumber} 
-                     width={2}
-                     height={80}
-                     fontSize={18}
+                     width={2.5}
+                     height={120}
+                     fontSize={20}
                      background="transparent"
                      lineColor="#1e293b"
                    />
