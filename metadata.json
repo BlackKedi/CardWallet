@@ -1,0 +1,7 @@
+{
+  "name": "CardWallet AI",
+  "description": "A smart loyalty card wallet similar to Stocard. Organize your membership cards with beautiful visuals and use Gemini AI to scan and add new cards automatically.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
