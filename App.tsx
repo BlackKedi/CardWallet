@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
+import Barcode from 'react-barcode';
 import { Card, ViewState, PRESET_COLORS } from './types';
 import { DEFAULT_CARDS } from './constants';
 import CardComponent from './components/Card';
@@ -15,10 +16,11 @@ export default function App() {
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Add Card State
+  // Add/Edit Card State
   const [newCardStore, setNewCardStore] = useState('');
   const [newCardNumber, setNewCardNumber] = useState('');
   const [newCardColor, setNewCardColor] = useState(PRESET_COLORS[0]);
+  const [newCardType, setNewCardType] = useState<'barcode' | 'qrcode'>('barcode');
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,25 +45,58 @@ export default function App() {
     setNewCardStore('');
     setNewCardNumber('');
     setNewCardColor(PRESET_COLORS[0]);
+    setNewCardType('barcode');
     setIsProcessingAI(false);
   };
 
-  const handleAddCardSubmit = (e: React.FormEvent) => {
+  const initEditMode = () => {
+    if (!activeCard) return;
+    setNewCardStore(activeCard.storeName);
+    setNewCardNumber(activeCard.cardNumber);
+    setNewCardType(activeCard.type);
+    
+    // Find matching color object or default
+    const matchingColor = PRESET_COLORS.find(c => c.from === activeCard.colorFrom) || PRESET_COLORS[0];
+    setNewCardColor(matchingColor);
+    
+    setView('EDIT');
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCardStore || !newCardNumber) return;
 
-    const newCard: Card = {
-      id: Date.now().toString(),
-      storeName: newCardStore,
-      cardNumber: newCardNumber,
-      colorFrom: newCardColor.from,
-      colorTo: newCardColor.to,
-      type: 'qrcode', 
-      logoIcon: 'fa-credit-card'
-    };
-
-    setCards([newCard, ...cards]);
-    handleBack();
+    if (view === 'EDIT' && activeCard) {
+      // Update existing
+      const updatedCards = cards.map(c => 
+        c.id === activeCard.id 
+          ? {
+              ...c,
+              storeName: newCardStore,
+              cardNumber: newCardNumber,
+              colorFrom: newCardColor.from,
+              colorTo: newCardColor.to,
+              type: newCardType
+            }
+          : c
+      );
+      setCards(updatedCards);
+      setActiveCard({ ...activeCard, storeName: newCardStore, cardNumber: newCardNumber, colorFrom: newCardColor.from, colorTo: newCardColor.to, type: newCardType });
+      setView('DETAIL');
+    } else {
+      // Create new
+      const newCard: Card = {
+        id: Date.now().toString(),
+        storeName: newCardStore,
+        cardNumber: newCardNumber,
+        colorFrom: newCardColor.from,
+        colorTo: newCardColor.to,
+        type: newCardType, 
+        logoIcon: 'fa-credit-card'
+      };
+      setCards([newCard, ...cards]);
+      handleBack();
+    }
   };
 
   const handleAIUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,12 +145,20 @@ export default function App() {
             <i className="fa fa-arrow-left"></i>
           </button>
           
-          <button 
-            onClick={() => deleteCard(activeCard.id)}
-            className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center text-red-400 hover:text-red-600 transition"
-          >
-            <i className="fa fa-trash-alt text-sm"></i>
-          </button>
+          <div className="flex space-x-3">
+            <button 
+              onClick={initEditMode}
+              className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-600 hover:text-indigo-600 transition"
+            >
+              <i className="fa fa-pen text-sm"></i>
+            </button>
+            <button 
+              onClick={() => deleteCard(activeCard.id)}
+              className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center text-red-400 hover:text-red-600 transition"
+            >
+              <i className="fa fa-trash-alt text-sm"></i>
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -132,18 +175,31 @@ export default function App() {
              <div className="absolute -left-3 top-1/2 w-6 h-6 bg-zinc-50 rounded-full"></div>
              <div className="absolute -right-3 top-1/2 w-6 h-6 bg-zinc-50 rounded-full"></div>
 
-             <div className="w-full aspect-square max-w-[220px] p-2 bg-white rounded-xl">
-                <QRCode 
-                    value={activeCard.cardNumber} 
-                    size={256}
-                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                    viewBox={`0 0 256 256`}
-                    fgColor="#1e293b" // slate-800
-                />
+             <div className="w-full min-h-[180px] flex items-center justify-center p-2 bg-white rounded-xl overflow-hidden">
+                {activeCard.type === 'barcode' ? (
+                   <Barcode 
+                     value={activeCard.cardNumber} 
+                     width={2}
+                     height={80}
+                     fontSize={18}
+                     background="transparent"
+                     lineColor="#1e293b"
+                   />
+                ) : (
+                  <QRCode 
+                      value={activeCard.cardNumber} 
+                      size={200}
+                      style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                      viewBox={`0 0 256 256`}
+                      fgColor="#1e293b" // slate-800
+                  />
+                )}
              </div>
              
              <div className="text-center space-y-1">
-               <p className="text-slate-400 text-xs font-medium tracking-[0.2em] uppercase">Scan Code</p>
+               <p className="text-slate-400 text-xs font-medium tracking-[0.2em] uppercase">
+                  {activeCard.type === 'barcode' ? 'Scan Barcode' : 'Scan QR Code'}
+               </p>
                <p className="text-slate-800 text-xl font-mono tracking-widest">{activeCard.cardNumber}</p>
              </div>
           </div>
@@ -157,57 +213,69 @@ export default function App() {
     );
   }
 
-  // 2. Add Card View (Clean Form)
-  if (view === 'ADD') {
+  // 2. Add / Edit Card View (Clean Form)
+  if (view === 'ADD' || view === 'EDIT') {
     return (
       <div className="min-h-screen bg-zinc-50 flex flex-col">
         {/* Navbar */}
         <div className="p-6 flex items-center">
-          <button onClick={handleBack} className="text-slate-500 hover:text-slate-800 transition mr-4">
+          <button 
+            onClick={() => {
+              if (view === 'EDIT' && activeCard) setView('DETAIL');
+              else handleBack();
+            }} 
+            className="text-slate-500 hover:text-slate-800 transition mr-4"
+          >
             <i className="fa fa-times text-xl"></i>
           </button>
-          <h1 className="text-2xl font-light text-slate-800">Add Card</h1>
+          <h1 className="text-2xl font-light text-slate-800">
+            {view === 'EDIT' ? 'Edit Card' : 'Add Card'}
+          </h1>
         </div>
 
-        <div className="flex-1 px-6 max-w-md mx-auto w-full space-y-8">
+        <div className="flex-1 px-6 max-w-md mx-auto w-full space-y-8 pb-10">
           
-          {/* AI Scan Option - Minimalist Box */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm relative overflow-hidden group">
-             <div className="relative z-10 flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-1">
-                  <i className="fa fa-magic"></i>
+          {/* AI Scan Option - Only show on ADD */}
+          {view === 'ADD' && (
+            <>
+              <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm relative overflow-hidden group">
+                <div className="relative z-10 flex flex-col items-center text-center space-y-3">
+                    <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-1">
+                      <i className="fa fa-magic"></i>
+                    </div>
+                    <h3 className="font-medium text-slate-800">Auto-Scan with AI</h3>
+                    <p className="text-slate-400 text-sm max-w-[200px]">Upload a photo of your card and we'll extract the details.</p>
+                    
+                    <label className="mt-2 inline-flex items-center justify-center w-full py-3 bg-indigo-600 text-white rounded-xl font-medium text-sm cursor-pointer hover:bg-indigo-700 transition active:scale-95 shadow-md shadow-indigo-200">
+                      {isProcessingAI ? (
+                        <><i className="fa fa-circle-notch fa-spin mr-2"></i> Analyzing...</>
+                      ) : (
+                        <><i className="fa fa-camera mr-2"></i> Snap Photo</>
+                      )}
+                      <input 
+                        ref={fileInputRef}
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment"
+                        className="hidden" 
+                        onChange={handleAIUpload}
+                        disabled={isProcessingAI}
+                      />
+                    </label>
                 </div>
-                <h3 className="font-medium text-slate-800">Auto-Scan with AI</h3>
-                <p className="text-slate-400 text-sm max-w-[200px]">Upload a photo of your card and we'll extract the details.</p>
-                
-                <label className="mt-2 inline-flex items-center justify-center w-full py-3 bg-indigo-600 text-white rounded-xl font-medium text-sm cursor-pointer hover:bg-indigo-700 transition active:scale-95 shadow-md shadow-indigo-200">
-                  {isProcessingAI ? (
-                    <><i className="fa fa-circle-notch fa-spin mr-2"></i> Analyzing...</>
-                  ) : (
-                    <><i className="fa fa-camera mr-2"></i> Snap Photo</>
-                  )}
-                  <input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment"
-                    className="hidden" 
-                    onChange={handleAIUpload}
-                    disabled={isProcessingAI}
-                  />
-                </label>
-             </div>
-          </div>
+              </div>
 
-          <div className="relative flex items-center py-2">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase tracking-widest">Or Manual Entry</span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase tracking-widest">Or Manual Entry</span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+            </>
+          )}
 
           {/* Manual Form - Clean Inputs */}
-          <form onSubmit={handleAddCardSubmit} className="space-y-8">
-            <div className="space-y-5">
+          <form onSubmit={handleFormSubmit} className="space-y-8">
+            <div className="space-y-6">
               <div className="group">
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 group-focus-within:text-indigo-600 transition-colors">Store Name</label>
                 <input 
@@ -231,7 +299,42 @@ export default function App() {
                     placeholder="e.g. 123456789"
                     className="w-full px-0 py-3 bg-transparent border-b-2 border-slate-200 focus:border-indigo-600 outline-none transition-colors text-lg text-slate-800 placeholder-slate-300 font-mono"
                   />
-                  <i className="fa fa-barcode text-slate-300 ml-2"></i>
+                  {newCardType === 'barcode' ? (
+                     <i className="fa fa-barcode text-slate-300 ml-2"></i>
+                  ) : (
+                     <i className="fa fa-qrcode text-slate-300 ml-2"></i>
+                  )}
+                </div>
+              </div>
+
+              {/* Code Type Selection */}
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Code Type</label>
+                <div className="grid grid-cols-2 gap-4">
+                   <button
+                     type="button"
+                     onClick={() => setNewCardType('barcode')}
+                     className={`py-3 px-4 rounded-xl border flex items-center justify-center space-x-2 transition-all ${
+                       newCardType === 'barcode' 
+                       ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
+                       : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                     }`}
+                   >
+                     <i className="fa fa-barcode"></i>
+                     <span className="text-sm font-medium">Barcode</span>
+                   </button>
+                   <button
+                     type="button"
+                     onClick={() => setNewCardType('qrcode')}
+                     className={`py-3 px-4 rounded-xl border flex items-center justify-center space-x-2 transition-all ${
+                       newCardType === 'qrcode' 
+                       ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
+                       : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                     }`}
+                   >
+                     <i className="fa fa-qrcode"></i>
+                     <span className="text-sm font-medium">QR Code</span>
+                   </button>
                 </div>
               </div>
 
@@ -255,7 +358,7 @@ export default function App() {
               type="submit" 
               className="w-full bg-slate-900 text-white font-medium py-4 rounded-2xl shadow-lg shadow-slate-200 hover:bg-black transition active:scale-[0.98]"
             >
-              Save Card
+              {view === 'EDIT' ? 'Update Card' : 'Save Card'}
             </button>
           </form>
         </div>
