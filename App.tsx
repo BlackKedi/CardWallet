@@ -234,7 +234,7 @@ export default function App() {
              <div className="absolute -left-3 top-1/2 w-6 h-6 bg-zinc-50 rounded-full"></div>
              <div className="absolute -right-3 top-1/2 w-6 h-6 bg-zinc-50 rounded-full"></div>
 
-             <div className="w-full min-h-[180px] flex items-center justify-center p-2 bg-white rounded-xl overflow-hidden">
+             <div className="w-full min-h-[180px] flex flex-col items-center justify-center p-2 bg-white rounded-xl overflow-hidden">
                 {activeCard.type === 'barcode' ? (
                    <Barcode 
                      value={activeCard.cardNumber} 
@@ -254,6 +254,10 @@ export default function App() {
                       fgColor="#1e293b" 
                   />
                 )}
+                {/* Number below barcode */}
+                <p className="mt-3 text-[10px] text-slate-500 font-mono tracking-widest">
+                  {activeCard.cardNumber}
+                </p>
              </div>
           </div>
           
