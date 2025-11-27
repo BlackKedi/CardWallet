@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
 import Barcode from 'react-barcode';
@@ -16,6 +17,9 @@ export default function App() {
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Reorder Mode State
+  const [isReordering, setIsReordering] = useState(false);
+  
   // Add/Edit Card State
   const [newCardStore, setNewCardStore] = useState('');
   const [newCardNumber, setNewCardNumber] = useState('');
@@ -31,6 +35,7 @@ export default function App() {
 
   // --- Handlers ---
   const handleCardClick = (card: Card) => {
+    if (isReordering) return; // Disable click when reordering
     setActiveCard(card);
     setView('DETAIL');
   };
@@ -39,6 +44,7 @@ export default function App() {
     setView('LIST');
     setActiveCard(null);
     resetForm();
+    setIsReordering(false);
   };
 
   const resetForm = () => {
@@ -127,6 +133,18 @@ export default function App() {
     }
   };
 
+  // Reorder Logic
+  const moveCard = (index: number, direction: 'left' | 'right', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= cards.length) return;
+
+    const newCards = [...cards];
+    const [movedCard] = newCards.splice(index, 1);
+    newCards.splice(newIndex, 0, movedCard);
+    setCards(newCards);
+  };
+
   // --- Render Helpers ---
   const filteredCards = cards.filter(c => 
     c.storeName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -170,7 +188,7 @@ export default function App() {
           </div>
 
           {/* Code Display Area - Ticket Style */}
-          <div className="w-full bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center justify-center space-y-6 relative border border-slate-100">
+          <div className="w-full bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center justify-center relative border border-slate-100">
              {/* Ticket Punch Circles */}
              <div className="absolute -left-3 top-1/2 w-6 h-6 bg-zinc-50 rounded-full"></div>
              <div className="absolute -right-3 top-1/2 w-6 h-6 bg-zinc-50 rounded-full"></div>
@@ -184,6 +202,7 @@ export default function App() {
                      fontSize={20}
                      background="transparent"
                      lineColor="#1e293b"
+                     displayValue={false} // Hidden as requested
                    />
                 ) : (
                   <QRCode 
@@ -194,13 +213,6 @@ export default function App() {
                       fgColor="#1e293b" // slate-800
                   />
                 )}
-             </div>
-             
-             <div className="text-center space-y-1">
-               <p className="text-slate-400 text-xs font-medium tracking-[0.2em] uppercase">
-                  {activeCard.type === 'barcode' ? 'Scan Barcode' : 'Scan QR Code'}
-               </p>
-               <p className="text-slate-800 text-xl font-mono tracking-widest">{activeCard.cardNumber}</p>
              </div>
           </div>
           
@@ -376,16 +388,26 @@ export default function App() {
             <p className="text-slate-400 text-sm font-medium tracking-wider mb-1">Welcome back</p>
             <h1 className="text-3xl font-light text-slate-800 tracking-tight">My Wallet</h1>
           </div>
-          <button 
-            onClick={() => setView('ADD')}
-            className="bg-slate-900 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-300 hover:bg-black transition-all hover:scale-105 active:scale-95"
-          >
-            <i className="fa fa-plus text-lg"></i>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsReordering(!isReordering)}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isReordering ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+              title="Reorder Cards"
+            >
+              <i className="fa fa-sort text-lg"></i>
+            </button>
+            <button 
+              onClick={() => setView('ADD')}
+              disabled={isReordering}
+              className={`bg-slate-900 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-300 hover:bg-black transition-all hover:scale-105 active:scale-95 ${isReordering ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <i className="fa fa-plus text-lg"></i>
+            </button>
+          </div>
         </div>
         
         {/* Search - Pill Shape */}
-        <div className="relative group">
+        <div className={`relative group transition-opacity duration-300 ${isReordering ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
           <i className="fa fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"></i>
           <input 
             type="text" 
@@ -408,8 +430,17 @@ export default function App() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            {filteredCards.map(card => (
-              <CardComponent key={card.id} card={card} onClick={handleCardClick} />
+            {filteredCards.map((card, index) => (
+              <CardComponent 
+                key={card.id} 
+                card={card} 
+                onClick={handleCardClick} 
+                isReordering={isReordering}
+                onMoveLeft={(e) => moveCard(index, 'left', e)}
+                onMoveRight={(e) => moveCard(index, 'right', e)}
+                isFirst={index === 0}
+                isLast={index === filteredCards.length - 1}
+              />
             ))}
           </div>
         )}
