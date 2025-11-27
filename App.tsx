@@ -2,6 +2,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
 import Barcode from 'react-barcode';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  TouchSensor,
+  useSensor, 
+  useSensors, 
+  DragEndEvent 
+} from '@dnd-kit/core';
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  rectSortingStrategy 
+} from '@dnd-kit/sortable';
+
 import { Card, ViewState, PRESET_COLORS } from './types';
 import { DEFAULT_CARDS } from './constants';
 import CardComponent from './components/Card';
@@ -32,6 +49,25 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('wallet_cards', JSON.stringify(cards));
   }, [cards]);
+
+  // --- DnD Sensors ---
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Requires 8px movement to start drag, prevents accidental drags on click
+      },
+    }),
+    useSensor(TouchSensor, {
+      // Small delay on touch to distinguish between scrolling and dragging
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // --- Handlers ---
   const handleCardClick = (card: Card) => {
@@ -133,22 +169,27 @@ export default function App() {
     }
   };
 
-  // Reorder Logic
-  const moveCard = (index: number, direction: 'left' | 'right', e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newIndex = direction === 'left' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= cards.length) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-    const newCards = [...cards];
-    const [movedCard] = newCards.splice(index, 1);
-    newCards.splice(newIndex, 0, movedCard);
-    setCards(newCards);
+    if (active.id !== over?.id) {
+      setCards((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over?.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   };
 
   // --- Render Helpers ---
   const filteredCards = cards.filter(c => 
     c.storeName.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  // Disable reordering if searching
+  useEffect(() => {
+    if (searchTerm) setIsReordering(false);
+  }, [searchTerm]);
 
   // 1. Detail View (Clean, Focus Mode)
   if (view === 'DETAIL' && activeCard) {
@@ -202,7 +243,7 @@ export default function App() {
                      fontSize={20}
                      background="transparent"
                      lineColor="#1e293b"
-                     displayValue={false} // Hidden as requested
+                     displayValue={false} 
                    />
                 ) : (
                   <QRCode 
@@ -210,7 +251,7 @@ export default function App() {
                       size={200}
                       style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                       viewBox={`0 0 256 256`}
-                      fgColor="#1e293b" // slate-800
+                      fgColor="#1e293b" 
                   />
                 )}
              </div>
@@ -391,10 +432,11 @@ export default function App() {
           <div className="flex gap-2">
             <button
               onClick={() => setIsReordering(!isReordering)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isReordering ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+              disabled={!!searchTerm}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isReordering ? 'bg-indigo-100 text-indigo-600 ring-2 ring-indigo-200' : 'bg-white text-slate-600 hover:bg-slate-50'} ${searchTerm ? 'opacity-30' : ''}`}
               title="Reorder Cards"
             >
-              <i className="fa fa-sort text-lg"></i>
+              {isReordering ? <i className="fa fa-check text-lg"></i> : <i className="fa fa-sort text-lg"></i>}
             </button>
             <button 
               onClick={() => setView('ADD')}
@@ -429,20 +471,27 @@ export default function App() {
             <p className="text-slate-500 font-light">No cards found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {filteredCards.map((card, index) => (
-              <CardComponent 
-                key={card.id} 
-                card={card} 
-                onClick={handleCardClick} 
-                isReordering={isReordering}
-                onMoveLeft={(e) => moveCard(index, 'left', e)}
-                onMoveRight={(e) => moveCard(index, 'right', e)}
-                isFirst={index === 0}
-                isLast={index === filteredCards.length - 1}
-              />
-            ))}
-          </div>
+          <DndContext 
+            sensors={sensors} 
+            collisionDetection={closestCenter} 
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={filteredCards.map(c => c.id)} 
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-2 gap-4">
+                {filteredCards.map((card) => (
+                  <CardComponent 
+                    key={card.id} 
+                    card={card} 
+                    onClick={handleCardClick} 
+                    isReordering={isReordering}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
